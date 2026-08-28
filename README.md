@@ -10,6 +10,16 @@ Postgres for scan history, all orchestrated with Docker Compose.
 
 ---
 
+## Screenshot
+
+![ThreatLens dashboard showing the URL analysis bar, live engine badges and a recent-scans list with scored verdicts](docs/screenshot.png)
+
+The analyst dashboard: submit a URL for analysis, watch the active engines
+(reputation feeds, threat intel, sandbox, AI provider) light up as badges, and
+review recent scans with their threat scores and verdicts.
+
+---
+
 ## How it works
 
 A scan runs through five engines. Each contributes weighted risk factors; a
@@ -308,6 +318,4 @@ the `playwright` pin must match the base image tag.
 
 ## License
 
-No license file is included, which under default copyright means all rights are
-reserved and others cannot legally reuse this code. If you want it to be openly
-usable, add an `MIT` or `Apache-2.0` `LICENSE` file.
+Released under the [MIT License](LICENSE).
