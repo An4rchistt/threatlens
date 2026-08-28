@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "description": "Curated local threat feed of known-bad indicators. A match yields an instant, high-confidence malicious verdict without needing the scraper, AI or an external reputation call. This is a SEED feed of illustrative/known-abused indicators plus reusable patterns; for production it should be refreshed from live feeds (see backend/data/README or the reputation module docstring). Matches are keyed on registrable domain (eTLD+1) for 'domains', full host for 'hosts', and regex for 'patterns'.",
+  "updated": "2026-08-28",
+  "categories": {
+    "phishing": "Credential-harvesting / brand-impersonation site.",
+    "malware": "Distributes malware or acts as C2.",
+    "scam": "Fraud, fake shop, advance-fee or investment scam.",
+    "abused_infra": "Infrastructure repeatedly abused to host the above."
+  },
+  "domains": [
+    { "domain": "paypal-secure-login.com", "category": "phishing", "note": "PayPal credential-harvest lookalike" },
+    { "domain": "paypa1.com", "category": "phishing", "note": "PayPal typosquat (digit-for-letter)" },
+    { "domain": "secure-paypal-update.com", "category": "phishing", "note": "PayPal lure" },
+    { "domain": "appleid-verify.com", "category": "phishing", "note": "Apple ID phishing" },
+    { "domain": "apple-icloud-locked.com", "category": "phishing", "note": "iCloud lockout lure" },
+    { "domain": "microsoft-account-security.com", "category": "phishing", "note": "Microsoft account lure" },
+    { "domain": "office365-login-verify.com", "category": "phishing", "note": "Office 365 credential harvest" },
+    { "domain": "amazon-billing-update.com", "category": "phishing", "note": "Amazon billing lure" },
+    { "domain": "netflix-account-hold.com", "category": "phishing", "note": "Netflix payment-hold lure" },
+    { "domain": "facebook-security-check.com", "category": "phishing", "note": "Facebook lure" },
+    { "domain": "instagram-copyright-appeal.com", "category": "phishing", "note": "Instagram copyright lure" },
+    { "domain": "coinbase-wallet-verify.com", "category": "phishing", "note": "Coinbase seed-phrase theft" },
+    { "domain": "metamask-wallet-connect.com", "category": "phishing", "note": "MetaMask drainer" },
+    { "domain": "binance-security-alert.com", "category": "phishing", "note": "Binance lure" },
+    { "domain": "usps-redelivery-fee.com", "category": "scam", "note": "USPS parcel-fee smishing" },
+    { "domain": "dhl-parcel-customs.com", "category": "scam", "note": "DHL customs-fee smishing" },
+    { "domain": "irs-tax-refund-claim.com", "category": "scam", "note": "IRS refund fraud" },
+    { "domain": "hmrc-tax-rebate-uk.com", "category": "scam", "note": "HMRC rebate fraud" }
+  ],
+  "hosts": [
+    { "host": "login.paypa1-secure.tk", "category": "phishing", "note": "Observed PayPal kit host" }
+  ],
+  "patterns": [
+    {
+      "id": "brand_dash_secure_login",
+      "regex": "\\b(paypal|apple|microsoft|amazon|netflix|coinbase|binance|metamask|instagram|facebook|google|outlook|office365)[-.](secure|login|signin|sign-in|verify|verification|account|update|support|billing|alert|unlock|confirm|recovery|security)\\b",
+      "category": "phishing",
+      "note": "Brand name adjacent to a security/action word in the registrable label - the dominant phishing-domain morphology."
+    },
+    {
+      "id": "wallet_seed_recovery_host",
+      "regex": "\\b(wallet|seed|recovery|restore|validate|airdrop|claim)[-.]?(connect|verify|sync|phrase|metamask|ledger|trezor)\\b",
+      "category": "phishing",
+      "note": "Crypto wallet-drainer host morphology."
+    },
+    {
+      "id": "parcel_fee_scam_host",
+      "regex": "\\b(usps|dhl|fedex|ups|royalmail|dpd|correos)[-.]?(redelivery|customs|parcel|tracking|fee|package|delivery)[-.]?(pay|fee|update|confirm)?\\b",
+      "category": "scam",
+      "note": "Parcel-fee / redelivery smishing host morphology."
+    }
+  ]
+}

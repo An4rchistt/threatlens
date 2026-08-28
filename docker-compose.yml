@@ -1,0 +1,194 @@
+# ---------------------------------------------------------------------------
+# ThreatLens - AI-Powered Web Threat Detection & Phishing Analysis Platform
+# ---------------------------------------------------------------------------
+# Bring the stack up with:
+#   cp .env.example .env      (then fill in your API keys)
+#   docker compose up --build
+#
+# Services
+#   postgres  : durable scan history store (NOT published to the host)
+#   backend   : FastAPI + Playwright analysis engine        -> http://localhost:8000
+#   frontend  : Next.js analyst dashboard                   -> http://localhost:3000
+# ---------------------------------------------------------------------------
+name: threatlens
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: threatlens-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-threatlens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-threatlens_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-threatlens}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "${POSTGRES_USER:-threatlens}" -d "${POSTGRES_DB:-threatlens}" || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    # Deliberately NOT exposed on the host. Only the backend needs to reach it.
+    networks:
+      - threatlens-data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: threatlens/backend:latest
+    container_name: threatlens-backend
+    restart: unless-stopped
+    # `init: true` reaps zombie Chromium child processes left behind by crashed pages.
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # --- Persistence -----------------------------------------------------
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-threatlens}:${POSTGRES_PASSWORD:-threatlens_dev_password}@postgres:5432/${POSTGRES_DB:-threatlens}
+      # --- AI engine (LangChain over any OpenAI-compatible provider) -------
+      # AI_PROVIDER: groq | gemini | openrouter | ollama | openai | custom
+      # Leave AI_PROVIDER empty to auto-detect from whichever key is present.
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_JSON_MODE: ${AI_JSON_MODE:-}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-45}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-4096}
+      AI_REASONING_EFFORT: ${AI_REASONING_EFFORT:-}
+      # OpenRouter attribution headers (HTTP-Referer / X-Title).
+      AI_SITE_URL: ${AI_SITE_URL:-http://localhost:3000}
+      AI_SITE_NAME: ${AI_SITE_NAME:-ThreatLens}
+      # Provider-specific keys. Only one needs a value.
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # --- Threat intelligence --------------------------------------------
+      VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
+      VIRUSTOTAL_TIMEOUT_SECONDS: ${VIRUSTOTAL_TIMEOUT_SECONDS:-15}
+      # --- API hardening ---------------------------------------------------
+      # Leave API_KEY empty for local development. When set, every /api/*
+      # request must carry the matching `X-API-Key` header.
+      API_KEY: ${API_KEY:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-20}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      ENABLE_DOCS: ${ENABLE_DOCS:-1}
+      # --- Sandboxed scraper ----------------------------------------------
+      SCRAPER_NAV_TIMEOUT_MS: ${SCRAPER_NAV_TIMEOUT_MS:-10000}
+      SCRAPER_TOTAL_TIMEOUT_SECONDS: ${SCRAPER_TOTAL_TIMEOUT_SECONDS:-30}
+      SCRAPER_MAX_SCREENSHOT_BYTES: ${SCRAPER_MAX_SCREENSHOT_BYTES:-3500000}
+      # Chromium's setuid sandbox cannot start inside a container that drops
+      # capabilities, so it is disabled here. Compensating controls: JavaScript
+      # is disabled, sub-resource requests to private IP ranges are aborted,
+      # the process runs as an unprivileged user, and all Linux capabilities
+      # are dropped. Set to 0 if you run the container with SYS_ADMIN instead.
+      SCRAPER_NO_SANDBOX: ${SCRAPER_NO_SANDBOX:-1}
+      MAX_CONCURRENT_SCANS: ${MAX_CONCURRENT_SCANS:-2}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    # Chromium writes rendering surfaces to /dev/shm; the 64MB default causes
+    # renderer crashes on heavy pages.
+    shm_size: "1gb"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python3 -c "import sys,urllib.request;
+          sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status == 200 else 1)"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - threatlens-data
+      - threatlens-edge
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* values are inlined into the client bundle at build time.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        # NOTE: anything shipped in a browser bundle is public. Only set this
+        # for a local/trusted deployment; in production terminate auth in a
+        # server-side proxy instead of shipping the key to the client.
+        NEXT_PUBLIC_API_KEY: ${API_KEY:-}
+    image: threatlens/frontend:latest
+    container_name: threatlens-frontend
+    restart: unless-stopped
+    init: true
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - threatlens-edge
+
+  # Optional fully-local AI provider: no API key, no quota, no data leaving the
+  # host. Not started by default because the model download is multi-gigabyte.
+  #
+  #   docker compose --profile local-ai up --build
+  #   docker compose exec ollama ollama pull llama3.2
+  #
+  # Then set AI_PROVIDER=ollama in .env (no key needed) and restart the backend.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: threatlens-ollama
+    restart: unless-stopped
+    profiles:
+      - local-ai
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: 5m
+    volumes:
+      - ollama_models:/root/.ollama
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - threatlens-edge
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_models:
+    driver: local
+
+networks:
+  # Backend <-> Postgres only.
+  threatlens-data:
+    driver: bridge
+    internal: true
+  # Host <-> backend/frontend, and the outbound egress the scraper needs.
+  threatlens-edge:
+    driver: bridge

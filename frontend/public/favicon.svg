@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="ThreatLens">
+  <defs>
+    <linearGradient id="tl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="#0f172a" />
+  <path
+    d="M16 4.5 26 8v7.6c0 6.2-4.1 10.6-10 12.4-5.9-1.8-10-6.2-10-12.4V8l10-3.5Z"
+    fill="none"
+    stroke="url(#tl)"
+    stroke-width="2"
+    stroke-linejoin="round"
+  />
+  <circle cx="16" cy="15" r="4" fill="none" stroke="url(#tl)" stroke-width="2" />
+  <path d="m19 18 3.2 3.2" stroke="url(#tl)" stroke-width="2" stroke-linecap="round" />
+</svg>
