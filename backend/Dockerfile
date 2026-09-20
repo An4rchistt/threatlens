@@ -46,11 +46,11 @@ EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=10s --start-period=40s --retries=5 \
     CMD python3 -c "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status == 200 else 1)"
 
-CMD ["uvicorn", "main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "1", \
-     "--timeout-keep-alive", "75", \
-     "--proxy-headers", \
-     "--forwarded-allow-ips", "*", \
-     "--no-server-header"]
+CMD uvicorn main:app \
+    --host 0.0.0.0 \
+    --port ${PORT:-8000} \
+    --workers 1 \
+    --timeout-keep-alive 75 \
+    --proxy-headers \
+    --forwarded-allow-ips "*" \
+    --no-server-header
